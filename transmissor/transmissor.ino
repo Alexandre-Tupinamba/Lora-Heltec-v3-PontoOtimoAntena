@@ -1,3 +1,7 @@
+// Desliga a funcionalidade do display OLED na biblioteca, já que
+// não está sendo usado atualmente.
+#define HELTEC_NO_DISPLAY
+
 #include <heltec_unofficial.h>
 
 // Intervalo de frequências e passo
@@ -16,7 +20,24 @@ void setup() {
   }
 }
 
+// Espera a entrada do usuário para iniciar um novo teste e,
+// depois, espera mais `n` segundos para retornar.
+void esperarBotao(unsigned int n) {
+  Serial.println("Aperte o botão para iniciar o teste");
+  while (!button.isSingleClick()) {
+    heltec_loop(); // Necessário para atualizar o estado do botão
+  }
+
+  Serial.printf("Iniciando em %us...\n", n);
+  heltec_delay(n * 1000);
+}
+
 void loop() {
+  heltec_loop();
+
+  // Esperar mais tempo para o primeiro teste
+  esperarBotao(5);
+
   for (float freq = START_FREQ; freq <= END_FREQ; freq += STEP_FREQ) {
     // Configurar a frequência
     if (radio.setFrequency(freq) != RADIOLIB_ERR_NONE) {
@@ -33,7 +54,7 @@ void loop() {
       Serial.printf("Falha ao transmitir em %.2f MHz\n", freq);
     }
 
-    // Pausa entre transmissões (garante estabilidade)
-    delay(500);
+    // Esperar o usuario apertar o botão
+    esperarBotao(3);
   }
 }
