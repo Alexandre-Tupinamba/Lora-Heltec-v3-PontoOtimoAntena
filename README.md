@@ -117,7 +117,7 @@ Por padrão, o script salva os novos dados no arquivo CSV a cada 10 segundos. Pa
    Localize o seguinte trecho:
 
    ```python
-   time.sleep(10)
+   time.sleep(5)
    ```
 
 2. **Alterar o Valor**
