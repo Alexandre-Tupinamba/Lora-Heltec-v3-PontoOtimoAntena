@@ -1,4 +1,4 @@
-import serial 
+import serial
 import csv
 import time
 import threading
@@ -11,14 +11,14 @@ logging.basicConfig(level=logging.INFO, filename='arduino_log.txt', filemode='a'
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Configuração de Porta Serial
-SERIAL_PORT = 'COM4'  # Altere a porta aqui se necessário
+SERIAL_PORT = 'COM4'  # Altere a porta se necessário
 BAUD_RATE = 115200
 
 buffer = ""  # Buffer para leitura serial
 new_data = []  # Dados a serem salvos no CSV
 
 # Configuração do cabeçalho CSV
-HEADERS = ["Timestamp", "Frequência", "RSSI"]  # "SNR" pode ser adicionado aqui se necessário
+HEADERS = ["Timestamp", "Frequência", "SF", "PKG", "RSSI", "SNR"]
 
 # Conexão Serial
 def connect_serial():
@@ -39,7 +39,7 @@ def connect_serial():
 
 connect_serial()
 
-# Criação do arquivo CSV
+# Criação do arquivo CSV se não existir
 if not os.path.exists('transmissor_data.csv'):
     with open('transmissor_data.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
@@ -48,7 +48,6 @@ if not os.path.exists('transmissor_data.csv'):
 # Dicionário para manter o estado atual
 current_record = {}
 
-# Função para processar as linhas recebidas
 def process_received_data(lines):
     """
     Processa as linhas relevantes e extrai os dados necessários.
@@ -56,39 +55,61 @@ def process_received_data(lines):
     global new_data, current_record
     try:
         for line in lines:
-            print(f"Recebido: {line}")
+            print(f"Processando linha: {line}")
             line = line.strip()
-            if line.startswith("Frequência:"):
-                current_record = {}  # Reinicia o dicionário para um novo registro
-                frequencia = line.split(":", 1)[1].strip().split()[0]  # Extrai o valor numérico
-                current_record['Frequência'] = frequencia
-            elif "RSSI:" in line:
-                rssi = line.split(":", 1)[1].strip().split()[0]  # Apenas o valor numérico
-                current_record['RSSI'] = rssi
-                # Adiciona o carimbo de tempo
-                timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S.%f")[:-3]
-                current_record['Timestamp'] = timestamp
-                # Verifica se todos os campos estão presentes
-                if all(field in current_record for field in HEADERS):
+            if line.startswith("Recebido:"):
+                # Exemplo de linha:
+                # Recebido: FREQ: 900.00 SF: 11 PKG: 7
+                # Vamos extrair FREQ, SF e PKG
+                current_record = {}
+                parts = line.split()
+                # parts: ["Recebido:", "FREQ:", "900.00", "SF:", "11", "PKG:", "7"]
+                # FREQ: está em parts[2], SF em parts[4], PKG em parts[6]
+                freq = parts[2]
+                sf = parts[4]
+                pkg = parts[6]
+
+                current_record["Frequência"] = freq
+                current_record["SF"] = sf
+                current_record["PKG"] = pkg
+
+            elif line.startswith("RSSI:"):
+                # Exemplo: RSSI: -37.00 dBm
+                # Extrair apenas o valor numérico
+                # line.split(":")[1] -> " -37.00 dBm"
+                rssi_value = line.split(":", 1)[1].strip().split()[0]
+                current_record["RSSI"] = rssi_value
+
+            elif line.startswith("SNR:"):
+                # Exemplo: SNR: 8.25 dB
+                snr_value = line.split(":", 1)[1].strip().split()[0]
+                current_record["SNR"] = snr_value
+
+                # Agora, se já temos todos os campos, salvamos
+                if all(k in current_record for k in ["Frequência", "SF", "PKG", "RSSI", "SNR"]):
+                    # Adicionar Timestamp
+                    timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S.%f")[:-3]
+                    current_record["Timestamp"] = timestamp
                     # Adiciona o registro aos novos dados
                     new_data.append([current_record[field] for field in HEADERS])
-                    print(f"Processado: {current_record}")
-                    current_record = {}  # Reinicia para o próximo registro
-            # Código para processar o SNR (comentado)
-            # elif "SNR:" in line:
-            #     snr = line.split(":", 1)[1].strip().split()[0]  # Apenas o valor numérico
-            #     current_record['SNR'] = snr
+                    print(f"Processado e preparado para salvar: {current_record}")
+                    # Reinicia para o próximo registro
+                    current_record = {}
+
+            # Linhas que não correspondem ao padrão atual podem ser ignoradas
+            # Ex: "Todos os pacotes recebidos..." ou "Sincronizando..."
+            # Não afetam o parsing atual
+
     except Exception as e:
         logging.error(f"Erro ao processar linha: {line}. Erro: {e}")
 
-# Leitura e Processamento
 def read_and_process_data():
     """
     Lê dados da porta serial e processa as linhas.
     """
     global buffer
     try:
-        buffer += ser.read(ser.in_waiting).decode('utf-8')
+        buffer += ser.read(ser.in_waiting).decode('utf-8', errors='replace')
         if "\n" in buffer:
             lines = buffer.split("\n")
             buffer = lines[-1]  # Mantém a última linha incompleta no buffer
