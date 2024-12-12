@@ -1,5 +1,3 @@
-// Desliga a funcionalidade do display OLED na biblioteca, já que
-// não está sendo usado atualmente.
 #define HELTEC_NO_DISPLAY
 #include <heltec_unofficial.h>
 #include "../comum.hh"
@@ -8,52 +6,65 @@ void setup() {
   heltec_setup();
   Serial.println("Transmissor iniciado");
 
-  // Inicializar o rádio
   if (radio.begin() != RADIOLIB_ERR_NONE) {
     Serial.println("Erro ao inicializar o rádio.");
     while (true);
   }
 }
 
-// Espera a entrada do usuário para iniciar um novo teste e,
-// depois, espera mais `n` segundos para retornar.
-void esperarBotao(unsigned int n) {
-  Serial.println("Aperte o botão PRG para iniciar o teste");
+bool esperarSync(float freq, int sf) {
+  String receivedSync;
+  Serial.printf("Aguardando sincronização para %.2f MHz, SF %d...\n", freq, sf);
 
-  while (!button.isSingleClick()) {
-    heltec_loop(); // Necessário para atualizar o estado do botão
+  while (true) {
+    if (radio.receive(receivedSync) == RADIOLIB_ERR_NONE && receivedSync == "SYNC") {
+      Serial.println("Sincronização recebida. Enviando ACK...");
+      radio.transmit("ACK");
+      return true;
+    }
   }
+}
 
-  Serial.printf("Iniciando em %us...\n", n);
-  heltec_delay(n * 1000);
+void transmitirPacotes(float freq, int sf, int numPacotes) {
+  for (int i = 0; i < numPacotes; i++) {
+    String message = String("FREQ: ") + freq + " SF: " + sf + " PKG: " + i;
+    Serial.printf("Transmitindo: %s\n", message.c_str());
+
+    if (radio.transmit(message) != RADIOLIB_ERR_NONE) {
+      Serial.println("Erro ao transmitir pacote.");
+    }
+
+    // Verificar se o receptor confirmou a recepção de todos os pacotes
+    String confirmation;
+    if (radio.receive(confirmation) == RADIOLIB_ERR_NONE && confirmation == "DONE") {
+      Serial.println("Todos os pacotes recebidos pelo receptor. Avançando...");
+      break;
+    }
+
+    delay(200);  // Intervalo entre pacotes
+  }
 }
 
 void loop() {
   heltec_loop();
 
-  // Esperar mais tempo para o primeiro teste
-  esperarBotao(5);
-
   for (float freq = START_FREQ; freq <= END_FREQ; freq += STEP_FREQ) {
-    // Configurar a frequência
-    if (radio.setFrequency(freq) != RADIOLIB_ERR_NONE) {
-      Serial.printf("Falha ao configurar frequência %.2f MHz\n", freq);
-      continue;
+    for (int sf : {11, 12}) {  // Testar SF 11 e 12
+      if (radio.setFrequency(freq) != RADIOLIB_ERR_NONE || radio.setSpreadingFactor(sf) != RADIOLIB_ERR_NONE) {
+        Serial.printf("Erro ao configurar %.2f MHz, SF %d\n", freq, sf);
+        continue;
+      }
+
+      if (esperarSync(freq, sf)) {
+        transmitirPacotes(freq, sf, 10);
+      } else {
+        Serial.printf("Sincronização falhou para %.2f MHz, SF %d\n", freq, sf);
+      }
     }
+  }
 
-    // Mensagem a ser enviada
-    String message = "Hello on " + String(freq, 1) + " MHz";
-    Serial.printf("Transmitindo: %s\n", message.c_str());
-
-    // Transmitir a mensagem e ligar o indicador visual
-    heltec_led(30);
-    if (radio.transmit(message) != RADIOLIB_ERR_NONE) {
-      Serial.printf("Falha ao transmitir em %.2f MHz\n", freq);
-    }
-
-    heltec_led(0);
-
-    // Esperar o usuario apertar o botão
-    esperarBotao(3);
+  Serial.println("Teste concluído. Aguardando botão para reiniciar.");
+  while (!button.isSingleClick()) {
+    heltec_loop();
   }
 }
