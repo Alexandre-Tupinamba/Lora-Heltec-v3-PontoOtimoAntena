@@ -1,6 +1,6 @@
 ## Descrição
 
-Este script Python é projetado para ler dados de uma porta serial, processar entradas específicas e salvar as informações em um arquivo CSV. Especificamente, ele captura as informações de "Frequência" e "RSSI" provenientes de um dispositivo conectado via serial, adiciona um carimbo de tempo e salva esses dados para análise posterior.
+Este script Python é projetado para ler dados de uma porta serial, processar entradas específicas e salvar as informações em um arquivo CSV. Especificamente, ele captura as informações de "Frequência" e "RSSI" provenientes de um dispositivo conectado via serial, adiciona um carimbo de tempo e salva esses dados para análise posterior. Para isso, você precisa ter os códigos `Teste_pontootimo_antena_LoRa_Reciever.ino` e `Teste_pontootimo_antena_LoRa_tranmissor.ino` carregados, respectivamente, em dois módulos ESP32 LoRa Heltec v3, um atuando como receptor e outro como transmissor. O script em Python então fará a leitura da porta serial do dispositivo receptor, processando e registrando as informações no CSV.
 
 ## Funcionalidades
 
@@ -10,20 +10,30 @@ Este script Python é projetado para ler dados de uma porta serial, processar en
 - Salva os dados em um arquivo CSV com um carimbo de tempo.
 - Registra eventos e erros em um arquivo de log.
 - Possui código comentado para processar o "SNR" caso seja necessário no futuro.
+- Funciona em conjunto com dois ESP32 LoRa Heltec v3: um rodando o código `Teste_pontootimo_antena_LoRa_tranmissor.ino` e outro rodando `Teste_pontootimo_antena_LoRa_Reciever.ino`.
 
 ## Requisitos
 
 - Python 3.x
 - Biblioteca `pyserial` para comunicação serial.
 - Permissões adequadas para acessar a porta serial no sistema operacional.
+- Dois ESP32 LoRa Heltec v3:
+  - Um com o código `Teste_pontootimo_antena_LoRa_tranmissor.ino`
+  - Outro com o código `Teste_pontootimo_antena_LoRa_Reciever.ino`
 
 ## Instalação
 
-1. **Clonar o Repositório ou Baixar o Script**
+1. **Carregar os Códigos nos ESP32 LoRa**  
+   - Conecte o ESP32 LoRa Heltec v3 ao seu computador e abra a IDE Arduino ou PlatformIO.
+   - Carregue o sketch `Teste_pontootimo_antena_LoRa_tranmissor.ino` no ESP32 LoRa que será o transmissor.
+   - Carregue o sketch `Teste_pontootimo_antena_LoRa_Reciever.ino` no ESP32 LoRa que será o receptor.
+   - Certifique-se de que ambos os dispositivos estão alimentados e configurados corretamente.
+
+2. **Clonar o Repositório ou Baixar o Script Python**
 
    Faça o download do script Python para o seu computador.
 
-2. **Instalar Dependências**
+3. **Instalar Dependências**
 
    Abra um terminal ou prompt de comando e instale a biblioteca `pyserial` usando o pip:
 
@@ -31,7 +41,7 @@ Este script Python é projetado para ler dados de uma porta serial, processar en
    pip install pyserial
    ```
 
-3. **Configurar o Script**
+4. **Configurar o Script Python**
 
    - Abra o script em um editor de texto ou IDE.
    - Verifique e ajuste as seguintes configurações conforme necessário:
@@ -40,11 +50,11 @@ Este script Python é projetado para ler dados de uma porta serial, processar en
 
 ## Uso
 
-1. **Conectar o Dispositivo**
+1. **Conectar o Dispositivo Receptor via Porta Serial**
 
-   Conecte o dispositivo que envia os dados de "Frequência" e "RSSI" à porta serial do seu computador.
+   Conecte o ESP32 LoRa Heltec v3 (com o código `Teste_pontootimo_antena_LoRa_Reciever.ino`) à porta serial do seu computador. O outro ESP32, com o código de transmissor, deve estar ligado e enviando dados pela rede LoRa.
 
-2. **Executar o Script**
+2. **Executar o Script Python**
 
    No terminal ou prompt de comando, navegue até o diretório onde o script está localizado e execute:
 
@@ -57,8 +67,8 @@ Este script Python é projetado para ler dados de uma porta serial, processar en
 3. **Monitorar a Execução**
 
    - O script tentará conectar-se à porta serial especificada.
-   - Uma vez conectado, ele começará a ler e processar os dados recebidos.
-   - As informações extraídas serão exibidas no terminal e salvas no arquivo `transmissor_data.csv`.
+   - Uma vez conectado, ele começará a ler e processar os dados recebidos do ESP32 LoRa Receptor.
+   - As informações extraídas (Frequência e RSSI) serão exibidas no terminal e salvas no arquivo `transmissor_data.csv`.
    - Eventos e erros serão registrados no arquivo `arduino_log.txt`.
 
 4. **Interromper a Execução**
@@ -74,7 +84,7 @@ Este script Python é projetado para ler dados de uma porta serial, processar en
 
 ### Ativar o Salvamento do SNR
 
-Se você quiser também salvar os dados de "SNR", siga os passos abaixo:
+Se você quiser também salvar os dados de "SNR":
 
 1. **Atualizar o Cabeçalho CSV**
 
@@ -107,7 +117,7 @@ Por padrão, o script salva os novos dados no arquivo CSV a cada 10 segundos. Pa
    Localize o seguinte trecho:
 
    ```python
-   time.sleep(10)
+   time.sleep(5)
    ```
 
 2. **Alterar o Valor**
@@ -120,17 +130,18 @@ Por padrão, o script salva os novos dados no arquivo CSV a cada 10 segundos. Pa
 
   Se o script não conseguir conectar-se à porta serial, verifique se:
 
-  - O dispositivo está corretamente conectado.
+  - O dispositivo receptor (ESP32 LoRa com o código `Teste_pontootimo_antena_LoRa_Reciever.ino`) está corretamente conectado.
   - A porta serial especificada em `SERIAL_PORT` está correta.
   - Você tem as permissões necessárias para acessar a porta serial.
+  - O transmissor (ESP32 LoRa com o código `Teste_pontootimo_antena_LoRa_tranmissor.ino`) está funcionando corretamente, enviando dados.
 
 - **Dados Não Estão Sendo Salvos no CSV**
 
-  - Certifique-se de que o dispositivo está enviando dados no formato esperado.
+  - Certifique-se de que o transmissor esteja enviando dados no formato esperado.
   - Verifique se o script está recebendo e processando as linhas corretas (elas devem começar com "Frequência:" e conter "RSSI:").
 
 - **Exceções ou Erros Inesperados**
 
   - Consulte o arquivo `arduino_log.txt` para detalhes sobre o erro.
   - Verifique se todas as dependências estão instaladas corretamente.
-
+  - Certifique-se de que os códigos nos ESP32 LoRa estão rodando sem erros.
